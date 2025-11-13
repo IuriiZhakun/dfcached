@@ -20,6 +20,9 @@ fastparquet = { version = ">=2023.0.0", optional = true }
 [tool.poetry.extras]
 parquet = ["pyarrow", "fastparquet"]
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.1"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
