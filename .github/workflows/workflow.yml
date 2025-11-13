@@ -47,6 +47,8 @@ jobs:
           [ "$V" = "$TAG" ] || (echo "Tag $TAG != version $V" && exit 1)
       - name: Build sdist and wheel
         run: poetry build
+      - name: Twine check
+        run: pipx run twine check dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: dist
@@ -69,6 +71,8 @@ jobs:
         with:
           packages-dir: dist
           repository-url: https://test.pypi.org/legacy/
+          verbose: true
+          skip-existing: true
 
   publish-pypi:
     needs: build                     # <- blocked if tests/build failed
@@ -86,4 +90,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
+          verbose: true
+
 
