@@ -2,7 +2,6 @@ from dfcached import persist_cache
 import time
 import threading
 from pathlib import Path
-import json
 import pandas as pd
 
 def test_lock_prevents_double_compute(tmp_path, monkeypatch):
@@ -31,7 +30,10 @@ def test_lock_prevents_double_compute(tmp_path, monkeypatch):
     results = [None, None]
     t1 = threading.Thread(target=worker, args=(results, 0))
     t2 = threading.Thread(target=worker, args=(results, 1))
-    t1.start(); t2.start(); t1.join(); t2.join()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
 
     # only one execution of function body
     assert len(calls) == 1

@@ -3,7 +3,8 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
-import os, json, pickle
+import os
+import pickle
 import pandas as pd
 
 from ._integrity import sha256_file

@@ -1,5 +1,4 @@
 # tests/test_integrity.py
-from pathlib import Path
 import json
 import pytest
 import pandas as pd
@@ -21,7 +20,8 @@ def test_checksums_strict_raises_with_clear_message(tmp_path, monkeypatch):
 
     # corrupt the data file
     with open(data_file, "r+b") as f:
-        f.seek(0); f.write(b"\x00\x00\x00CORRUPTED")
+        f.seek(0)
+        f.write(b"\x00\x00\x00CORRUPTED")
 
     with pytest.raises(ValueError) as ei:
         make()
@@ -47,7 +47,8 @@ def test_checksums_non_strict_autoheals(tmp_path, monkeypatch):
     data_file = manifest.parent / entry["file"]
 
     with open(data_file, "r+b") as f:
-        f.seek(0); f.write(b"\x00BAD")
+        f.seek(0)
+        f.write(b"\x00BAD")
 
     # Should recompute and NOT raise
     out = make()
@@ -118,7 +119,8 @@ def test_refresh_bypasses_corrupt_cache_and_rewrites(tmp_path, monkeypatch):
     leaf = next(iter_leaf_entries(meta))
     data_file = manifest.parent / leaf["file"]
     with open(data_file, "r+b") as f:
-        f.seek(0); f.write(b"\x00\x00BADBADBAD")
+        f.seek(0)
+        f.write(b"\x00\x00BADBADBAD")
 
     @persist_cache(cache_dir=".dfcached_cache", version="v1", refresh=True)
     def h_refresh():

@@ -64,7 +64,8 @@ def test_clear_all_cache_root(tmp_path, monkeypatch):
     def b():
         return (pd.DataFrame({"y": [3]}), 42)
 
-    a(); b()
+    a()
+    b()
 
     # root exists before clear
     assert Path(CACHE).exists()

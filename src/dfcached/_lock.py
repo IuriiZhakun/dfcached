@@ -2,7 +2,8 @@
 # src/dfcached/_lock.py
 from __future__ import annotations
 from pathlib import Path
-import os, time
+import os
+import time
 
 __all__ = ["DirLock"]
 

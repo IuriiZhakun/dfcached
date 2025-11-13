@@ -1,7 +1,9 @@
 # src/dfcached/_key.py
 from __future__ import annotations
 from typing import Optional, Iterable, Tuple, Any, Dict
-import pickle, hashlib, base64
+import pickle
+import hashlib
+import base64
 
 __all__ = ["make_key", "b64", "b64d"]
 

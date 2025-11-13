@@ -3,7 +3,7 @@
 from __future__ import annotations
 from pathlib import Path
 from functools import wraps
-from typing import Any, Callable, Optional, Union, Iterable
+from typing import Callable, Optional, Union, Iterable
 import json
 
 from ._key import make_key

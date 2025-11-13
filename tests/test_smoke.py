@@ -1,5 +1,6 @@
 from dfcached import persist_cache
-import pandas as pd, time
+import pandas as pd
+import time
 
 def test_hot_hit(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)

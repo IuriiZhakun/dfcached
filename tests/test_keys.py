@@ -1,8 +1,6 @@
-import json
 import time
 from pathlib import Path
 import pandas as pd
-import pytest
 
 from dfcached import persist_cache
 
@@ -81,9 +79,10 @@ def test_non_picklable_arg_fallback_repr_same_object_hits_cache(tmp_path, monkey
         calls.append(time.time())  # record compute
         return "ok"
 
-    lam = lambda z: z  # same object reused
-    h(lam)             # cold
-    h(lam)             # hot
+    def id_fn(z):
+        return z 
+    h(id_fn)          # cold
+    h(id_fn)          # hot
     assert len(calls) == 1  # computed only once
 
 def test_kwargs_exclusion_still_holds(tmp_path, monkeypatch):
