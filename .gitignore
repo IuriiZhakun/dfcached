@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Poetry / virtualenv
+.venv/
+poetry.lock
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Tools
+.pytest_cache/
+.cache/
+.idea/
+.vscode/
+
+# Example cache dir we’ll use
+.dfcached_cache/
+
