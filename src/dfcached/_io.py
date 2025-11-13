@@ -1,10 +1,11 @@
-# -----------------------------------------------------------------------------
-# src/dfcached/_io.py
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Dict
+import json
 import os
 import pickle
+
 import pandas as pd
 
 from ._integrity import sha256_file
@@ -18,6 +19,7 @@ __all__ = [
     "load_result",
 ]
 
+
 def atomic_write_text(path: Path, text: str) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
@@ -28,22 +30,35 @@ def atomic_write_text(path: Path, text: str) -> None:
 
 
 def save_df(base: Path, label: str, df: pd.DataFrame, *, write_checksums: bool) -> Dict[str, Any]:
+    """
+    Write a DataFrame as parquet (fallback to pickle), return manifest leaf node.
+    """
+    p: Path
+    kind: str
     try:
         p = base / f"{label}.parquet"
         df.to_parquet(p)
-        node = {"kind": "parquet", "file": p.name}
+        kind = "parquet"
     except Exception:
         p = base / f"{label}.pkl"
         with open(p, "wb") as f:
             pickle.dump(df, f, protocol=pickle.HIGHEST_PROTOCOL)
-        node = {"kind": "pickle", "file": p.name}
+        kind = "pickle"
+
+    node: Dict[str, Any] = {"kind": kind, "file": p.name}
     if write_checksums:
         sha, size = sha256_file(p)
         node["sha256"], node["size"] = sha, size
     return node
 
 
-def load_leaf(base: Path, entry: Dict[str, Any], *, verify_checksums: bool = False, strict_integrity: bool = True) -> Any:
+def load_leaf(
+    base: Path,
+    entry: Dict[str, Any],
+    *,
+    verify_checksums: bool = False,
+    strict_integrity: bool = True,
+) -> Any:
     path = base / entry["file"]
     if verify_checksums and "sha256" in entry:
         sha, size = sha256_file(path)
@@ -60,8 +75,8 @@ def load_leaf(base: Path, entry: Dict[str, Any], *, verify_checksums: bool = Fal
                 f"strict_integrity={strict_integrity}: refusing to load cached result.\n"
                 "Fix one of the following:\n"
                 "  1) Delete the corrupted file or its parent cache key directory and retry.\n"
-                f"  2) Re-run with strict_integrity=False to recompute and overwrite.\n"
-                f"  3) If you intentionally modified the file, update the stored checksum in:\n"
+                "  2) Re-run with strict_integrity=False to recompute and overwrite.\n"
+                "  3) If you intentionally modified the file, update the stored checksum in:\n"
                 f"       {str(manifest_path)}\n"
             )
             raise ValueError(msg)
@@ -72,15 +87,21 @@ def load_leaf(base: Path, entry: Dict[str, Any], *, verify_checksums: bool = Fal
 
 
 def save_result(base: Path, result: Any, *, write_checksums: bool) -> Dict[str, Any]:
+    """
+    Persist a supported result and return the manifest meta.
+    - DataFrame -> parquet (fallback pickle)
+    - tuple/list/dict: DataFrame elements to parquet else pickle
+    - other single object -> pickle
+    """
     if isinstance(result, pd.DataFrame):
         e = save_df(base, "0", result, write_checksums=write_checksums)
         return {"container": "df", "items": [e]}
 
     if isinstance(result, tuple):
-        out = []
+        items_tuple: list[Dict[str, Any]] = []
         for i, v in enumerate(result):
             if isinstance(v, pd.DataFrame):
-                out.append(save_df(base, str(i), v, write_checksums=write_checksums))
+                node = save_df(base, str(i), v, write_checksums=write_checksums)
             else:
                 p = base / f"{i}.pkl"
                 with open(p, "wb") as f:
@@ -89,14 +110,14 @@ def save_result(base: Path, result: Any, *, write_checksums: bool) -> Dict[str, 
                 if write_checksums:
                     sha, size = sha256_file(p)
                     node["sha256"], node["size"] = sha, size
-                out.append(node)
-        return {"container": "tuple", "items": out}
+            items_tuple.append(node)
+        return {"container": "tuple", "items": items_tuple}
 
     if isinstance(result, list):
-        out = []
+        items_list: list[Dict[str, Any]] = []
         for i, v in enumerate(result):
             if isinstance(v, pd.DataFrame):
-                out.append(save_df(base, str(i), v, write_checksums=write_checksums))
+                node = save_df(base, str(i), v, write_checksums=write_checksums)
             else:
                 p = base / f"{i}.pkl"
                 with open(p, "wb") as f:
@@ -105,25 +126,25 @@ def save_result(base: Path, result: Any, *, write_checksums: bool) -> Dict[str, 
                 if write_checksums:
                     sha, size = sha256_file(p)
                     node["sha256"], node["size"] = sha, size
-                out.append(node)
-        return {"container": "list", "items": out}
+            items_list.append(node)
+        return {"container": "list", "items": items_list}
 
     if isinstance(result, dict):
-        out = []
+        items_dict: list[Dict[str, Any]] = []
         for i, (k, v) in enumerate(result.items()):
             key_b64 = b64(pickle.dumps(k, protocol=5))  # preserve key type
             if isinstance(v, pd.DataFrame):
-                entry = save_df(base, str(i), v, write_checksums=write_checksums)
+                entry_node = save_df(base, str(i), v, write_checksums=write_checksums)
             else:
                 p = base / f"{i}.pkl"
                 with open(p, "wb") as f:
                     pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
-                entry = {"kind": "pickle", "file": p.name}
+                entry_node = {"kind": "pickle", "file": p.name}
                 if write_checksums:
                     sha, size = sha256_file(p)
-                    entry["sha256"], entry["size"] = sha, size
-            out.append({"key_b64": key_b64, "entry": entry})
-        return {"container": "dict", "items": out}
+                    entry_node["sha256"], entry_node["size"] = sha, size
+            items_dict.append({"key_b64": key_b64, "entry": entry_node})
+        return {"container": "dict", "items": items_dict}
 
     # other single object
     p = base / "0.pkl"
@@ -141,17 +162,28 @@ def load_result(base: Path, meta: Dict[str, Any], *, verify_checksums: bool, str
     if c == "df":
         return load_leaf(base, meta["items"][0], verify_checksums=verify_checksums, strict_integrity=strict_integrity)
     if c == "tuple":
-        return tuple(load_leaf(base, e, verify_checksums=verify_checksums, strict_integrity=strict_integrity) for e in meta["items"])
+        return tuple(
+            load_leaf(base, e, verify_checksums=verify_checksums, strict_integrity=strict_integrity)
+            for e in meta["items"]
+        )
     if c == "list":
-        return [load_leaf(base, e, verify_checksums=verify_checksums, strict_integrity=strict_integrity) for e in meta["items"]]
+        return [
+            load_leaf(base, e, verify_checksums=verify_checksums, strict_integrity=strict_integrity)
+            for e in meta["items"]
+        ]
     if c == "dict":
-        d = {}
+        d: Dict[Any, Any] = {}
         for item in meta["items"]:
+            # decode key: base64 -> bytes -> original object
             k = pickle.loads(b64d(item["key_b64"]))
-            d[k] = load_leaf(base, item["entry"], verify_checksums=verify_checksums, strict_integrity=strict_integrity)
+            d[k] = load_leaf(
+                base,
+                item["entry"],
+                verify_checksums=verify_checksums,
+                strict_integrity=strict_integrity,
+            )
         return d
     if c == "other":
         return load_leaf(base, meta["items"][0], verify_checksums=verify_checksums, strict_integrity=strict_integrity)
     raise ValueError("unknown container")
-
 

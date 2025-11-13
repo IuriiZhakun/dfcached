@@ -98,10 +98,6 @@ def test_kwargs_exclusion_still_holds(tmp_path, monkeypatch):
     b = k(5, nonce=999)     # hot
     assert a == b
 
-def _count_key_dirs(cache_root: Path, func_qualname: str) -> int:
-    func_dir = cache_root / func_qualname
-    return len([p for p in func_dir.glob("*") if p.is_dir()])
-
 def test_kwargs_order_insensitive_when_enabled(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     cache = Path(".dfcached_cache")
