@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Minimal on-disk cache decorator: DataFrame→Parquet (else pickle); others→pickle; top-level containers."
 authors = ["Iurii Zhakun <yurij.zhacun@gmail.com>"]
 readme = "README.md"
+license = "MIT"
 packages = [{ include = "dfcached", from = "src" }]
+homepage = "https://github.com/IuriiZhakun/dfcached"
+repository = "https://github.com/IuriiZhakun/dfcached"
+documentation = "https://github.com/IuriiZhakun/dfcached#readme"
+keywords = ["cache", "pandas", "parquet", "pickle", "decorator"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.14"
@@ -15,10 +20,11 @@ fastparquet = { version = ">=2023.0.0", optional = true }
 [tool.poetry.extras]
 parquet = ["pyarrow", "fastparquet"]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "<9,>=8.2"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+xfail_strict = true
 

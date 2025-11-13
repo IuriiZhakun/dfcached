@@ -11,19 +11,38 @@ def _b64(x: bytes) -> str: return base64.b64encode(x).decode("ascii")
 def _b64d(s: str) -> bytes: return base64.b64decode(s.encode("ascii"))
 def _is_df(x: Any) -> bool: return isinstance(x, pd.DataFrame)
 
-def _key(func_name: str, args: tuple, kwargs: dict,
-         version: Optional[str], exclude: Optional[Iterable[str]]) -> str:
+
+def _key(
+    func_name: str,
+    args: tuple,
+    kwargs: dict,
+    version: Optional[str],
+    exclude: Optional[Iterable[str]],
+    canonicalize_kwargs: bool,
+) -> str:
+    # 1) filter kwargs
     if exclude:
-        kwargs = dict(kwargs)
-        for k in exclude: kwargs.pop(k, None)
+        kwargs = {k: v for k, v in kwargs.items() if k not in exclude}
+
+    # 2) canonicalize kwargs order if requested (kwargs keys are always str)
+    if canonicalize_kwargs:
+        kw_items = tuple(sorted(kwargs.items(), key=lambda kv: kv[0]))
+        payload = (args, kw_items)
+    else:
+        payload = (args, kwargs)
+
+    # 3) hash
     m = hashlib.sha256()
     m.update(func_name.encode("utf-8"))
-    if version: m.update(b"|ver:"); m.update(version.encode("utf-8"))
+    if version:
+        m.update(b"|ver:" + version.encode("utf-8"))
     try:
-        m.update(pickle.dumps((args, kwargs), protocol=5))
+        buf = pickle.dumps(payload, protocol=5)
     except Exception:
-        m.update(repr((args, kwargs)).encode("utf-8"))
+        buf = repr(payload).encode("utf-8")
+    m.update(buf)
     return m.hexdigest()
+
 
 def _atomic_write_text(path: Path, text: str) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -136,6 +155,7 @@ def persist_cache(
     exclude_from_key: Optional[Iterable[str]] = None,
     lock_timeout: float = 10.0,
     lock_sleep: float = 0.02,
+    canonicalize_kwargs: bool = True,
 ) -> Callable:
     """
     Minimal on-disk cache for top-level containers.
@@ -148,7 +168,11 @@ def persist_cache(
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            key = key_fn(args, kwargs) if key_fn else _key(qual, args, kwargs, version, exclude_from_key)
+            key = (
+                 key_fn(args, kwargs)
+                 if key_fn
+                 else _key(qual, args, kwargs, version, exclude_from_key, canonicalize_kwargs)
+             )
             base = cache_root / qual / key
             manifest = base / "manifest.json"
 
