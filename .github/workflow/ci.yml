@@ -19,4 +19,8 @@ jobs:
         run: poetry install
       - name: Run tests
         run: poetry run pytest -q
+      - name: Ruff
+        run: pipx run ruff check src tests
+      - name: Mypy
+        run: poetry run mypy src tests
 

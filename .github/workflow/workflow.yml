@@ -1,0 +1,89 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write   # required for Trusted Publishing (OIDC)
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install deps
+        run: poetry install
+      - name: Run tests
+        run: poetry run pytest -q
+
+  build:
+    needs: test                      # <- publish is blocked until tests pass
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"     # fine for pure-Python wheels
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Verify tag matches pyproject version
+        run: |
+          V=$(poetry version -s)
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "pyproject: $V  tag: $TAG"
+          [ "$V" = "$TAG" ] || (echo "Tag $TAG != version $V" && exit 1)
+      - name: Build sdist and wheel
+        run: poetry build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    needs: build                     # <- blocked if tests/build failed
+    if: contains(github.ref_name, 'rc')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Publish to TestPyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    needs: build                     # <- blocked if tests/build failed
+    if: "!contains(github.ref_name, 'rc')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+
