@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dfcached"
-version = "0.1.0"
+version = "0.2.0rc1"
 description = "Minimal on-disk cache decorator: DataFrame→Parquet (else pickle); others→pickle; top-level containers."
 authors = ["Iurii Zhakun <yurij.zhacun@gmail.com>"]
 readme = "README.md"
